@@ -21,7 +21,6 @@ def jwt_response_payload_handler(token, user=None, request=None):
 def get_client_ip(request):
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
-        print(x_forwarded_for)
         ip = x_forwarded_for.split(',')[0]
     else:
         ip = request.META.get('REMOTE_ADDR', None)
@@ -32,16 +31,14 @@ def user_is_authenticated(request):
     # Check user logged in and return user object
     user = User()
     output = None, False
-    if request.headers.get("Authorization"):
+    if not request.headers.get("Authorization"):
         return output
     headers = request.headers.get("Authorization").split()
-    if len(headers) == 2 and headers[0] == jwt_auth_header_prefix:
+    if not (len(headers) == 2 and headers[0] == jwt_auth_header_prefix):
         return output
 
     payload = jwt_decode_handler(headers[1])
-    user_id = payload.get("user_id")
-    user_object_id = ObjectId(user_id)
-    qs = user.collection.find({"_id": user_object_id})
+    qs = user.collection.find({"_id": ObjectId(payload.get("user_id"))})
     if qs.count() == 1:
         output = qs.next(), True
         return output
