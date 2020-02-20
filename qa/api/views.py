@@ -4,10 +4,10 @@ from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from ..models import Question, Answer
+from ..models import Question, QuestionViews, Answer
 from .serializers import QuestionSerializer, AnswerSerializer
 from comments.models import Comment
-from accounts.api.utils import user_is_authenticated
+from accounts.api.utils import user_is_authenticated, get_client_ip
 from backend.permissions import TokenPermission, IsOwnerOrReadOnly, QuestionExistPermission
 
 from django.http import Http404
@@ -49,11 +49,38 @@ class QuestionDetailAPIView(generics.RetrieveAPIView):
 
     def get(self, request, *args, **kwargs):
         instance = self.get_object()
+        question_views = QuestionViews()
         user, user_logged_in = user_is_authenticated(request)
-        # if user_logged_in:
-        #     # user id
-        # else:
-        #     #ip
+        if user_logged_in:
+            user_id = user.get("_id")
+            user_ip = get_client_ip(request)
+            question_id = instance.get("_id")
+            qs = question_views.collection.find({"$and": [{"user_id": user_id}, {"question_id": question_id}]})
+            if not qs.count():
+                question_views.set_user_id(user_id)
+                question_views.set_user_ip(user_ip)
+                question_views.set_question_id(question_id)
+                data = {
+                    "user_id": question_views.get_user_id(),
+                    "user_ip": question_views.get_user_ip(),
+                    "question_id": question_views.get_question_id(),
+                    "created_at": question_views.get_created_at()
+                }
+                question_views.save(data)
+        else:
+            user_ip = get_client_ip(request)
+            question_id = instance.get("_id")
+            qs = question_views.collection.find({"$and": [{"user_ip": user_ip}, {"question_id": question_id}]})
+            if not qs.count():
+                question_views.set_user_ip(user_ip)
+                question_views.set_question_id(question_id)
+                data = {
+                    "user_id": question_views.get_user_id(),
+                    "user_ip": question_views.get_user_ip(),
+                    "question_id": question_views.get_question_id(),
+                    "created_at": question_views.get_created_at()
+                }
+                question_views.save(data)
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
