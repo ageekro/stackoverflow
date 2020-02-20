@@ -12,7 +12,6 @@ djangorestframework = "*"
 djangorestframework-jwt = "*"
 requests = "*"
 django-cors-headers = "*"
-schedule = "*"
 python-crontab = "*"
 
 [requires]
