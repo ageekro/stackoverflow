@@ -12,10 +12,10 @@ jwt_auth_header_prefix = api_settings.JWT_AUTH_HEADER_PREFIX
 class TokenPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         user = User()
-        if request.headers.get("Authorization"):
+        if not request.headers.get("Authorization"):
             return False
         headers = request.headers.get("Authorization").split()
-        if len(headers) == 2 and headers[0] == jwt_auth_header_prefix:
+        if not (len(headers) == 2 and headers[0] == jwt_auth_header_prefix):
             return False
 
         payload = jwt_decode_handler(headers[1])
