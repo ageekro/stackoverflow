@@ -13,6 +13,7 @@ djangorestframework-jwt = "*"
 requests = "*"
 django-cors-headers = "*"
 python-crontab = "*"
+pika = "*"
 
 [requires]
 python_version = "3.7"
