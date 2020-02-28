@@ -1,3 +1,4 @@
+import json
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
 from rest_framework import generics
@@ -8,6 +9,7 @@ from ..models import Question, QuestionViews, Answer
 from .serializers import QuestionSerializer, AnswerSerializer
 from comments.models import Comment
 from accounts.api.utils import user_is_authenticated, get_client_ip
+from send import Publisher
 from backend.permissions import TokenPermission, IsOwnerOrReadOnly, QuestionExistPermission
 
 from django.http import Http404
@@ -57,30 +59,19 @@ class QuestionDetailAPIView(generics.RetrieveAPIView):
             question_id = instance.get("_id")
             qs = question_views.collection.find({"$and": [{"user_id": user_id}, {"question_id": question_id}]})
             if not qs.count():
-                question_views.set_user_id(user_id)
-                question_views.set_user_ip(user_ip)
-                question_views.set_question_id(question_id)
-                data = {
-                    "user_id": question_views.get_user_id(),
-                    "user_ip": question_views.get_user_ip(),
-                    "question_id": question_views.get_question_id(),
-                    "created_at": question_views.get_created_at()
-                }
-                question_views.save(data)
+                publisher = Publisher("question")
+                data = {"action": "Add question views", "user_id": str(user_id), "user_ip": user_ip,
+                        "question_id": str(question_id)}
+                publisher.publish(json.dumps(data))
         else:
             user_ip = get_client_ip(request)
             question_id = instance.get("_id")
             qs = question_views.collection.find({"$and": [{"user_ip": user_ip}, {"question_id": question_id}]})
             if not qs.count():
-                question_views.set_user_ip(user_ip)
-                question_views.set_question_id(question_id)
-                data = {
-                    "user_id": question_views.get_user_id(),
-                    "user_ip": question_views.get_user_ip(),
-                    "question_id": question_views.get_question_id(),
-                    "created_at": question_views.get_created_at()
-                }
-                question_views.save(data)
+                publisher = Publisher("question")
+                data = {"action": "Add question views", "user_ip": user_ip,
+                        "question_id": str(question_id)}
+                publisher.publish(json.dumps(data))
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
@@ -129,22 +120,9 @@ class QuestionDestroyAPIView(generics.DestroyAPIView):
             comment.remove({"_id": ObjectId(c)})
         answer = Answer()
         answer.collection.delete_many({"question_id": instance.get("_id")})
+        question_views = QuestionViews()
+        question_views.collection.delete_many({"question_id": instance.get("_id")})
         self.question.remove({"_id": instance.get("_id")})
-
-
-class QuestionViewsAPIView(APIView):
-
-    def get(self, request, pk):
-        question = Question()
-        try:
-            question_id = ObjectId(pk)
-        except InvalidId:
-            raise Http404("question id is not valid.")
-        qs = question.collection.find({"_id": question_id})
-        if qs.count() == 1:
-            question.collection.update({"_id": ObjectId(question_id)}, {"$inc": {"views": 1}})
-            return Response({"viewed": True})
-        return Response({'message': "question object doesn't exists."}, status=400)
 
 
 class AnswerCreateAPIView(generics.CreateAPIView):
