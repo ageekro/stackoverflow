@@ -1,6 +1,8 @@
 import json
+
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
+
 from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -13,6 +15,8 @@ from send import Publisher
 from backend.permissions import TokenPermission, IsOwnerOrReadOnly, QuestionExistPermission
 
 from django.http import Http404
+
+from elasticsearch import Elasticsearch
 
 
 class QuestionCreateAPIView(generics.CreateAPIView):
@@ -409,3 +413,16 @@ class AnswerVoteDownAPIView(APIView):
                 data = {"action": "decrease answer votes", "vote_id": str(vote_obj.get("_id"))}
                 publisher.publish(json.dumps(data))
                 return Response({"vote_added": False})
+
+
+class SearchAPIView(APIView):
+    def get(self, request):
+        es = Elasticsearch()
+        query = self.request.GET.get('q', None)
+        if query is not None:
+            res = es.search(index="questions", body={"query": {"query_string": {"fields": ["title", "body"],
+                                                                                "query": "*{query}*".format(
+                                                                                    query=query)}}})
+            return Response({"results": res["hits"]["hits"]})
+
+        return Response({"message": "Not Found!!!"})

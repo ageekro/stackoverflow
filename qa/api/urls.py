@@ -13,11 +13,13 @@ from .views import (QuestionCreateAPIView,
                     AnswerUpdateAPIView,
                     AnswerDestroyAPIView,
                     AnswerVoteUpAPIView,
-                    AnswerVoteDownAPIView
+                    AnswerVoteDownAPIView,
+                    SearchAPIView
                     )
 
 app_name = 'qa'
 urlpatterns = [
+    path('search/', SearchAPIView.as_view(), name="search"),
     path('question/ask/', QuestionCreateAPIView.as_view(), name="question-create"),
     path('questions/', QuestionListAPIView.as_view(), name='question-list'),
     re_path(r'^questions/(?P<pk>[\w\d-]+)/$', QuestionDetailAPIView.as_view(), name='question-detail'),
