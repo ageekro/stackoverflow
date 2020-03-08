@@ -5,7 +5,7 @@ from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from ..models import Question, QuestionViews, Answer
+from ..models import Question, QuestionViews, Answer, Vote
 from .serializers import QuestionSerializer, AnswerSerializer
 from comments.models import Comment
 from accounts.api.utils import user_is_authenticated, get_client_ip
@@ -59,7 +59,7 @@ class QuestionDetailAPIView(generics.RetrieveAPIView):
             question_id = instance.get("_id")
             qs = question_views.collection.find({"$and": [{"user_id": user_id}, {"question_id": question_id}]})
             if not qs.count():
-                publisher = Publisher("question")
+                publisher = Publisher("stack")
                 data = {"action": "Add question views", "user_id": str(user_id), "user_ip": user_ip,
                         "question_id": str(question_id)}
                 publisher.publish(json.dumps(data))
@@ -68,7 +68,7 @@ class QuestionDetailAPIView(generics.RetrieveAPIView):
             question_id = instance.get("_id")
             qs = question_views.collection.find({"$and": [{"user_ip": user_ip}, {"question_id": question_id}]})
             if not qs.count():
-                publisher = Publisher("question")
+                publisher = Publisher("stack")
                 data = {"action": "Add question views", "user_ip": user_ip,
                         "question_id": str(question_id)}
                 publisher.publish(json.dumps(data))
@@ -113,7 +113,8 @@ class QuestionDestroyAPIView(generics.DestroyAPIView):
             raise Http404("No question matches the given query.")
 
     def perform_destroy(self, instance):
-        # delete all question's comments and answers when question deleted.
+        # delete all question's comments and answers, question views when question deleted.
+        # TODO: delete all question votes
         comment = Comment()
         comments = instance.get("comments")
         for c in comments:
@@ -123,6 +124,104 @@ class QuestionDestroyAPIView(generics.DestroyAPIView):
         question_views = QuestionViews()
         question_views.collection.delete_many({"question_id": instance.get("_id")})
         self.question.remove({"_id": instance.get("_id")})
+
+
+class QuestionVoteUpAPIView(APIView):
+
+    def get_object(self, question, pk):
+        try:
+            question_id = ObjectId(pk)
+        except InvalidId:
+            return False
+        qs = question.collection.find({"_id": question_id})
+        if qs.count() == 1:
+            return qs.next()
+        else:
+            return False
+
+    def get(self, request, pk):
+        user, user_logged_in = user_is_authenticated(request)
+        if not user_logged_in:
+            return Response({"message": "Not Allowed."}, status=400)
+
+        question = Question()
+        question_obj = self.get_object(question, pk)
+        if not question_obj:
+            return Response({"message": "Question object doesn't exists."}, status=400)
+
+        vote = Vote()
+        qs = vote.collection.find({"$and": [{"user_id": user.get("_id")}, {"data_id": question_obj.get("_id")}]})
+        if not qs.count():
+            publisher = Publisher("stack")
+            data = {"action": "Add question votes", "user_id": str(user.get("_id")),
+                    "data_id": pk, "question_votes": question_obj.get("votes"), "vote_type": 1}
+            publisher.publish(json.dumps(data))
+            return Response({"vote_added": True})
+        else:
+            vote_obj = qs.next()
+            if vote_obj.get("vote_type") == 1:
+                publisher = Publisher("stack")
+                data = {"action": "undo question votes",
+                        "question_id": pk, "question_votes": question_obj.get("votes"),
+                        "vote_id": str(vote_obj.get("_id"))}
+
+                publisher.publish(json.dumps(data))
+                return Response({"vote_added": False})
+            else:
+                # update question vote type to 1 when vote type is -1
+                publisher = Publisher("stack")
+                data = {"action": "increase question votes", "vote_id": str(vote_obj.get("_id"))}
+                publisher.publish(json.dumps(data))
+                return Response({"vote_added": False})
+
+
+class QuestionVoteDownAPIView(APIView):
+
+    def get_object(self, question, pk):
+        try:
+            question_id = ObjectId(pk)
+        except InvalidId:
+            return False
+        qs = question.collection.find({"_id": question_id})
+        if qs.count() == 1:
+            return qs.next()
+        else:
+            return False
+
+    def get(self, request, pk):
+        user, user_logged_in = user_is_authenticated(request)
+        if not user_logged_in:
+            return Response({"message": "Not Allowed."}, status=400)
+
+        question = Question()
+        question_obj = self.get_object(question, pk)
+        if not question_obj:
+            return Response({"message": "Question object doesn't exists."}, status=400)
+
+        vote = Vote()
+        qs = vote.collection.find({"$and": [{"user_id": user.get("_id")}, {"data_id": question_obj.get("_id")}]})
+        if not qs.count():
+            publisher = Publisher("stack")
+            data = {"action": "Add question votes", "user_id": str(user.get("_id")),
+                    "data_id": pk, "question_votes": question_obj.get("votes"), "vote_type": -1}
+            publisher.publish(json.dumps(data))
+            return Response({"vote_added": True})
+        else:
+            vote_obj = qs.next()
+            if vote_obj.get("vote_type") == -1:
+                publisher = Publisher("stack")
+                data = {"action": "undo question votes",
+                        "question_id": pk, "question_votes": question_obj.get("votes"),
+                        "vote_id": str(vote_obj.get("_id"))}
+
+                publisher.publish(json.dumps(data))
+                return Response({"vote_added": False})
+            else:
+                # update question vote type to -1 when vote type is 1
+                publisher = Publisher("stack")
+                data = {"action": "decrease question votes", "vote_id": str(vote_obj.get("_id"))}
+                publisher.publish(json.dumps(data))
+                return Response({"vote_added": False})
 
 
 class AnswerCreateAPIView(generics.CreateAPIView):
@@ -204,6 +303,7 @@ class AnswerDestroyAPIView(generics.DestroyAPIView):
 
     def perform_destroy(self, instance):
         # delete all answers's comment when answer deleted.
+        # TODO: delete all answer votes
         question = Question()
         comment = Comment()
         comments = instance.get("comments")
@@ -211,3 +311,101 @@ class AnswerDestroyAPIView(generics.DestroyAPIView):
             comment.remove({"_id": ObjectId(c)})
         self.answer.remove({"_id": instance.get("_id")})
         question.collection.update({"_id": instance.get("question_id")}, {"$inc": {"answers_number": -1}})
+
+
+class AnswerVoteUpAPIView(APIView):
+
+    def get_object(self, answer, pk):
+        try:
+            answer_id = ObjectId(pk)
+        except InvalidId:
+            return False
+        qs = answer.collection.find({"_id": answer_id})
+        if qs.count() == 1:
+            return qs.next()
+        else:
+            return False
+
+    def get(self, request, pk):
+        user, user_logged_in = user_is_authenticated(request)
+        if not user_logged_in:
+            return Response({"message": "Not Allowed."}, status=400)
+
+        answer = Answer()
+        answer_obj = self.get_object(answer, pk)
+        if not answer:
+            return Response({"message": "Answer object doesn't exists."}, status=400)
+
+        vote = Vote()
+        qs = vote.collection.find({"$and": [{"user_id": user.get("_id")}, {"data_id": answer_obj.get("_id")}]})
+        if not qs.count():
+            publisher = Publisher("stack")
+            data = {"action": "Add answer votes", "user_id": str(user.get("_id")),
+                    "data_id": pk, "answer_votes": answer_obj.get("votes"), "vote_type": 1}
+            publisher.publish(json.dumps(data))
+            return Response({"vote_added": True})
+        else:
+            vote_obj = qs.next()
+            if vote_obj.get("vote_type") == 1:
+                publisher = Publisher("stack")
+                data = {"action": "undo answer votes",
+                        "answer_id": pk, "answer_votes": answer_obj.get("votes"),
+                        "vote_id": str(vote_obj.get("_id"))}
+
+                publisher.publish(json.dumps(data))
+                return Response({"vote_added": False})
+            else:
+                # update answer vote type to 1 when vote type is -1
+                publisher = Publisher("stack")
+                data = {"action": "increase answer votes", "vote_id": str(vote_obj.get("_id"))}
+                publisher.publish(json.dumps(data))
+                return Response({"vote_added": False})
+
+
+class AnswerVoteDownAPIView(APIView):
+
+    def get_object(self, answer, pk):
+        try:
+            answer_id = ObjectId(pk)
+        except InvalidId:
+            return False
+        qs = answer.collection.find({"_id": answer_id})
+        if qs.count() == 1:
+            return qs.next()
+        else:
+            return False
+
+    def get(self, request, pk):
+        user, user_logged_in = user_is_authenticated(request)
+        if not user_logged_in:
+            return Response({"message": "Not Allowed."}, status=400)
+
+        answer = Answer()
+        answer_obj = self.get_object(answer, pk)
+        if not answer_obj:
+            return Response({"message": "Answer object doesn't exists."}, status=400)
+
+        vote = Vote()
+        qs = vote.collection.find({"$and": [{"user_id": user.get("_id")}, {"data_id": answer_obj.get("_id")}]})
+        if not qs.count():
+            publisher = Publisher("stack")
+            data = {"action": "Add answer votes", "user_id": str(user.get("_id")),
+                    "data_id": pk, "answer_votes": answer_obj.get("votes"), "vote_type": -1}
+            publisher.publish(json.dumps(data))
+            return Response({"vote_added": True})
+        else:
+            vote_obj = qs.next()
+            if vote_obj.get("vote_type") == -1:
+                publisher = Publisher("stack")
+                data = {"action": "undo answer votes",
+                        "answer_id": pk, "answer_votes": answer_obj.get("votes"),
+                        "vote_id": str(vote_obj.get("_id"))}
+
+                publisher.publish(json.dumps(data))
+                return Response({"vote_added": False})
+            else:
+                # update question vote type to -1 when vote type is 1
+                publisher = Publisher("stack")
+                data = {"action": "decrease answer votes", "vote_id": str(vote_obj.get("_id"))}
+                publisher.publish(json.dumps(data))
+                return Response({"vote_added": False})
