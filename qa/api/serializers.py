@@ -1,6 +1,9 @@
+import json
 from bson.objectid import ObjectId
 from rest_framework import serializers
 from rest_framework_jwt.settings import api_settings
+
+from elasticsearch import Elasticsearch
 
 from django.utils.html import escape
 from django.utils.timesince import timesince
@@ -75,6 +78,7 @@ class QuestionSerializer(serializers.Serializer):
         return obj.get_comments()
 
     def create(self, validated_data):
+        es = Elasticsearch()
         question = Question()
         request = self.context.get("request")
         token = request.headers.get("Authorization").split()[1]
@@ -97,6 +101,12 @@ class QuestionSerializer(serializers.Serializer):
         }
         q_id = question.save(data)
         question.set_id(q_id)
+
+        data["user_id"] = user_id
+        data["timestamp"] = question.get_timestamp().isoformat()
+        data.pop("_id")
+        res = es.create(index="questions", id=str(question.get_id()), body=json.dumps(data))
+        print(res)
         return question
 
     def update(self, instance, validated_data):
