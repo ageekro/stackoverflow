@@ -13,7 +13,7 @@ class Question(MongoConnection):
         self.title = ""
         self.body = ""
         self.tags = []
-        self.vote_count = 0
+        self.votes = []
         self.views = 0
         self.answers_number = 0
         self.timestamp = timezone.now()
@@ -54,11 +54,11 @@ class Question(MongoConnection):
         tag_list = re.findall(tag_regex, tags)
         [self.tags.append(x) for x in tag_list if x not in self.tags]
 
-    def get_vote_count(self):
-        return self.vote_count
+    def get_votes(self):
+        return self.votes
 
-    def set_vote_count(self, vote_count):
-        self.vote_count = vote_count
+    def set_votes(self, votes):
+        self.votes.extend(votes)
 
     def get_views(self):
         return self.views
@@ -147,7 +147,7 @@ class Answer(MongoConnection):
         self.user_id = None
         self.question_id = None
         self.body = ""
-        self.vote_count = 0
+        self.votes = []
         self.update_time = None
         self.timestamp = timezone.now()
         self.comments = []
@@ -179,11 +179,11 @@ class Answer(MongoConnection):
     def set_body(self, body):
         self.body = body
 
-    def get_vote_count(self):
-        return self.vote_count
+    def get_votes(self):
+        return self.votes
 
-    def set_vote_count(self, vote_count):
-        self.vote_count = vote_count
+    def set_votes(self, votes):
+        self.votes.extend(votes)
 
     def get_update_time(self):
         return self.update_time
@@ -202,3 +202,44 @@ class Answer(MongoConnection):
 
     def set_comments(self, comment_ids):
         self.comments.extend(comment_ids)
+
+
+class Vote(MongoConnection):
+    def __init__(self):
+        super().__init__()
+        self.get_collection("vote")
+        self._id = None
+        self.user_id = None
+        self.data_id = None
+        self.vote_type = None
+        self.created_at = timezone.now()
+
+    def get_id(self):
+        return self._id
+
+    def set_id(self, _id):
+        self._id = _id
+
+    def get_user_id(self):
+        return self.user_id
+
+    def set_user_id(self, user_id):
+        self.user_id = user_id
+
+    def get_data_id(self):
+        return self.data_id
+
+    def set_data_id(self, data_id):
+        self.data_id = data_id
+
+    def get_vote_type(self):
+        return self.vote_type
+
+    def set_vote_type(self, vote_type):
+        self.vote_type = vote_type
+
+    def get_created_at(self):
+        return self.created_at
+
+    def set_created_at(self, date):
+        self.created_at = date
