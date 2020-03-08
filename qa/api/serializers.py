@@ -17,7 +17,7 @@ class QuestionSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=300)
     body = serializers.CharField(max_length=600)
     tags = serializers.CharField(max_length=100)
-    vote_count = serializers.SerializerMethodField(read_only=True)
+    votes = serializers.SerializerMethodField(read_only=True)
     views = serializers.SerializerMethodField(read_only=True)
     answers_number = serializers.SerializerMethodField(read_only=True)
     timesince = serializers.SerializerMethodField(read_only=True)
@@ -42,10 +42,10 @@ class QuestionSerializer(serializers.Serializer):
             return str(obj.get("user_id"))
         return obj.get_user_id()
 
-    def get_vote_count(self, obj):
+    def get_votes(self, obj):
         if isinstance(obj, dict):
-            return obj.get("vote_count")
-        return obj.get_vote_count()
+            return obj.get("votes")
+        return obj.get_votes()
 
     def get_views(self, obj):
         if isinstance(obj, dict):
@@ -89,7 +89,7 @@ class QuestionSerializer(serializers.Serializer):
             "title": question.get_title(),
             "body": question.get_body(),
             "tags": question.get_tags(),
-            "vote_count": question.get_vote_count(),
+            "votes": question.get_votes(),
             "views": question.get_views(),
             "answers_number": question.get_answers_number(),
             "timestamp": question.get_timestamp(),
@@ -124,7 +124,7 @@ class AnswerSerializer(serializers.Serializer):
     user_id = serializers.SerializerMethodField(read_only=True)
     question_id = serializers.SerializerMethodField(read_only=True)
     body = serializers.CharField(max_length=600)
-    vote_count = serializers.SerializerMethodField(read_only=True)
+    votes = serializers.SerializerMethodField(read_only=True)
     timesince = serializers.SerializerMethodField(read_only=True)
     display_date = serializers.SerializerMethodField(read_only=True)
     comments = serializers.SerializerMethodField(read_only=True)
@@ -148,10 +148,10 @@ class AnswerSerializer(serializers.Serializer):
             return str(obj.get("question_id"))
         return obj.get_question_id()
 
-    def get_vote_count(self, obj):
+    def get_votes(self, obj):
         if isinstance(obj, dict):
-            return obj.get("vote_count")
-        return obj.get_vote_count()
+            return obj.get("votes")
+        return obj.get_votes()
 
     def get_timesince(self, obj):
         if isinstance(obj, dict):
@@ -185,7 +185,7 @@ class AnswerSerializer(serializers.Serializer):
             "user_id": ObjectId(user_id),
             "question_id": ObjectId(question_id),
             "body": answer.get_body(),
-            "vote_count": answer.get_vote_count(),
+            "votes": answer.get_votes(),
             "timestamp": answer.get_timestamp(),
             "comments": answer.get_comments()
         }
