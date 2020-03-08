@@ -47,7 +47,4 @@ def parsed_tags_receiver(tag_list):
     if len(tag_list) > 0:
         tag = Tag()
         for tag_var in tag_list:
-            new_tag, created = tag.get_or_create(tag_var)
-
-
-
+            tag.get_or_create(tag_var)
